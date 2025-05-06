@@ -14,10 +14,9 @@ from pipecat.audio.vad.silero import SileroVADAnalyzer
 from pipecat.pipeline.pipeline import Pipeline
 from pipecat.pipeline.runner import PipelineRunner
 from pipecat.pipeline.task import PipelineParams, PipelineTask
-from pipecat.processors.aggregators.openai_llm_context import OpenAILLMContext
+from pipecat.services.aws.llm import BedrockLLMContext, BedrockLLMService
+from pipecat.services.aws.stt import TranscribeSTTService
 from pipecat.services.aws.tts import PollyTTSService
-from pipecat.services.deepgram.stt import DeepgramSTTService
-from pipecat.services.openai.llm import OpenAILLMService
 from pipecat.transports.base_transport import TransportParams
 from pipecat.transports.network.small_webrtc import SmallWebRTCTransport
 from pipecat.transports.network.webrtc_connection import SmallWebRTCConnection
@@ -37,26 +36,32 @@ async def run_bot(webrtc_connection: SmallWebRTCConnection, _: argparse.Namespac
         ),
     )
 
-    stt = DeepgramSTTService(api_key=os.getenv("DEEPGRAM_API_KEY"))
+    stt = TranscribeSTTService()
 
     tts = PollyTTSService(
-        api_key=os.getenv("AWS_SECRET_ACCESS_KEY"),
-        aws_access_key_id=os.getenv("AWS_ACCESS_KEY_ID"),
-        region=os.getenv("AWS_REGION"),
-        voice_id="Amy",
-        params=PollyTTSService.InputParams(engine="neural", language="en-GB", rate="1.05"),
+        region="us-west-2",  # only specific regions support generative TTS
+        voice_id="Joanna",
+        params=PollyTTSService.InputParams(engine="generative", language="en-US", rate="1.1"),
     )
 
-    llm = OpenAILLMService(api_key=os.getenv("OPENAI_API_KEY"))
+    llm = BedrockLLMService(
+        aws_region="us-west-2",
+        model="us.anthropic.claude-3-5-haiku-20241022-v1:0",
+        params=BedrockLLMService.InputParams(temperature=0.8, latency="optimized"),
+    )
 
     messages = [
         {
             "role": "system",
-            "content": "You are a helpful LLM in a WebRTC call. Your goal is to demonstrate your capabilities in a succinct way. Your output will be converted to audio so don't include special characters in your answers. Respond to what the user said in a creative and helpful way.",
+            "content": [
+                {
+                    "text": "You are a helpful LLM in a WebRTC call. Your goal is to demonstrate your capabilities in a succinct way. Your output will be converted to audio so don't include special characters in your answers. Respond to what the user said in a creative and helpful way."
+                }
+            ],
         },
     ]
 
-    context = OpenAILLMContext(messages)
+    context = BedrockLLMContext(messages)
     context_aggregator = llm.create_context_aggregator(context)
 
     pipeline = Pipeline(
