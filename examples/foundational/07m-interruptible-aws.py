@@ -39,15 +39,15 @@ async def run_bot(webrtc_connection: SmallWebRTCConnection, _: argparse.Namespac
     stt = TranscribeSTTService()
 
     tts = PollyTTSService(
-        region="us-west-2",  # only specific regions support generative TTS
+        region="ap-northeast-1",  # only specific regions support generative TTS
         voice_id="Joanna",
-        params=PollyTTSService.InputParams(engine="generative", language="en-US", rate="1.1"),
+        params=PollyTTSService.InputParams(engine="neural", language="en-US", rate="1.1"),
     )
 
     llm = BedrockLLMService(
-        aws_region="us-west-2",
-        model="us.anthropic.claude-3-5-haiku-20241022-v1:0",
-        params=BedrockLLMService.InputParams(temperature=0.8, latency="optimized"),
+        aws_region="ap-northeast-1",
+        model="apac.amazon.nova-lite-v1:0",
+        params=BedrockLLMService.InputParams(temperature=0.8, latency="standard"),
     )
 
     messages = [

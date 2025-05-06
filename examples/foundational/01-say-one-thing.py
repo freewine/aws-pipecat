@@ -14,7 +14,7 @@ from pipecat.frames.frames import EndFrame, TTSSpeakFrame
 from pipecat.pipeline.pipeline import Pipeline
 from pipecat.pipeline.runner import PipelineRunner
 from pipecat.pipeline.task import PipelineTask
-from pipecat.services.cartesia.tts import CartesiaTTSService
+from pipecat.services.aws.tts import PollyTTSService
 from pipecat.transports.base_transport import TransportParams
 from pipecat.transports.network.small_webrtc import SmallWebRTCTransport
 from pipecat.transports.network.webrtc_connection import SmallWebRTCConnection
@@ -33,9 +33,10 @@ async def run_bot(webrtc_connection: SmallWebRTCConnection, _: argparse.Namespac
         ),
     )
 
-    tts = CartesiaTTSService(
-        api_key=os.getenv("CARTESIA_API_KEY"),
-        voice_id="71a7ad14-091c-4e8e-a314-022ece01c121",  # British Reading Lady
+    tts = PollyTTSService(
+        region="ap-northeast-1",  # only specific regions support generative TTS
+        voice_id="Joanna",
+        params=PollyTTSService.InputParams(engine="neural", language="en-US", rate="1.1"),
     )
 
     task = PipelineTask(Pipeline([tts, transport.output()]))

@@ -25,13 +25,12 @@ from pipecat.frames.frames import (
 from pipecat.pipeline.pipeline import Pipeline
 from pipecat.pipeline.runner import PipelineRunner
 from pipecat.pipeline.task import PipelineParams, PipelineTask
-from pipecat.processors.aggregators.openai_llm_context import OpenAILLMContext
 from pipecat.processors.frame_processor import FrameDirection, FrameProcessor
 from pipecat.processors.frameworks.rtvi import RTVIObserver, RTVIProcessor
 from pipecat.processors.transcript_processor import TranscriptProcessor
-from pipecat.services.cartesia.tts import CartesiaTTSService
-from pipecat.services.deepgram.stt import DeepgramSTTService
-from pipecat.services.openai.llm import OpenAILLMService
+from pipecat.services.aws.llm import BedrockLLMContext, BedrockLLMService
+from pipecat.services.aws.stt import TranscribeSTTService
+from pipecat.services.aws.tts import PollyTTSService
 from pipecat.transports.services.daily import DailyParams, DailyTransport
 
 load_dotenv(override=True)
@@ -75,10 +74,14 @@ class TranslationProcessor(FrameProcessor):
             logger.debug(f"Translating {self._in_language}: {frame.text} to {self._out_language}")
             context = [
                 {
-                    "role": "system",
-                    "content": f"You will be provided with a sentence in {self._in_language}, and your task is to only translate it into {self._out_language}.",
+                    "role": "user",
+                    "content": [
+                        {
+                            "text": f"You will be provided with a sentence in {self._in_language}, and your task is to only translate it into {self._out_language}."
+                        }
+                    ],
                 },
-                {"role": "user", "content": frame.text},
+                {"role": "user", "content": [{"text": frame.text}]},
             ]
             await self.push_frame(LLMMessagesFrame(context))
         else:
@@ -138,19 +141,24 @@ async def main():
             ),
         )
 
-        stt = DeepgramSTTService(api_key=os.getenv("DEEPGRAM_API_KEY"))
+        stt = TranscribeSTTService()
 
-        tts = CartesiaTTSService(
-            api_key=os.getenv("CARTESIA_API_KEY"),
-            voice_id="34dbb662-8e98-413c-a1ef-1a3407675fe7",  # Spanish Narrator Man
-            model="sonic-2",
+        tts = PollyTTSService(
+            region="ap-northeast-1",  # only specific regions support generative TTS
+            voice_id="Lucia",
+            params=PollyTTSService.InputParams(engine="neural", language="es-ES", rate="1.1"),
         )
 
         in_language = "English"
         out_language = "Spanish"
 
-        llm = OpenAILLMService(api_key=os.getenv("OPENAI_API_KEY"))
-        context = OpenAILLMContext()
+        llm = BedrockLLMService(
+            aws_region="ap-northeast-1",
+            model="apac.amazon.nova-lite-v1:0",
+            params=BedrockLLMService.InputParams(temperature=0.8, latency="standard"),
+        )
+
+        context = BedrockLLMContext()
         context_aggregator = llm.create_context_aggregator(context)
 
         tp = TranslationProcessor(in_language=in_language, out_language=out_language)

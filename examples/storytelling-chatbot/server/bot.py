@@ -22,7 +22,7 @@ from pipecat.pipeline.pipeline import Pipeline
 from pipecat.pipeline.runner import PipelineRunner
 from pipecat.pipeline.task import PipelineParams, PipelineTask
 from pipecat.processors.aggregators.openai_llm_context import OpenAILLMContext
-from pipecat.services.elevenlabs.tts import ElevenLabsTTSService
+from pipecat.services.aws.tts import PollyTTSService
 from pipecat.services.google.image import GoogleImageGenService
 from pipecat.services.google.llm import GoogleLLMService
 from pipecat.transports.services.daily import (
@@ -65,8 +65,10 @@ async def main(room_url, token=None):
 
         llm_service = GoogleLLMService(api_key=os.getenv("GOOGLE_API_KEY"))
 
-        tts_service = ElevenLabsTTSService(
-            api_key=os.getenv("ELEVENLABS_API_KEY"), voice_id=os.getenv("ELEVENLABS_VOICE_ID")
+        tts_service = PollyTTSService(
+            region="ap-northeast-1",  # only specific regions support generative TTS
+            voice_id="Joanna",
+            params=PollyTTSService.InputParams(engine="neural", language="en-US", rate="1.1"),
         )
 
         image_gen = GoogleImageGenService(api_key=os.getenv("GOOGLE_API_KEY"))

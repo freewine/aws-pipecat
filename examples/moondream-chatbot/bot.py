@@ -29,13 +29,13 @@ from pipecat.pipeline.parallel_pipeline import ParallelPipeline
 from pipecat.pipeline.pipeline import Pipeline
 from pipecat.pipeline.runner import PipelineRunner
 from pipecat.pipeline.task import PipelineTask
-from pipecat.processors.aggregators.openai_llm_context import OpenAILLMContext
 from pipecat.processors.aggregators.sentence import SentenceAggregator
 from pipecat.processors.aggregators.vision_image_frame import VisionImageFrameAggregator
 from pipecat.processors.frame_processor import FrameDirection, FrameProcessor
-from pipecat.services.cartesia.tts import CartesiaTTSService
+from pipecat.services.aws.llm import BedrockLLMContext, BedrockLLMService
+from pipecat.services.aws.stt import TranscribeSTTService
+from pipecat.services.aws.tts import PollyTTSService
 from pipecat.services.moondream.vision import MoondreamService
-from pipecat.services.openai.llm import OpenAILLMService
 from pipecat.transports.services.daily import DailyParams, DailyTransport
 
 load_dotenv(override=True)
@@ -151,12 +151,17 @@ async def main():
             ),
         )
 
-        tts = CartesiaTTSService(
-            api_key=os.getenv("CARTESIA_API_KEY"),
-            voice_id="71a7ad14-091c-4e8e-a314-022ece01c121",  # British Reading Lady
+        tts = PollyTTSService(
+            region="ap-northeast-1",  # only specific regions support generative TTS
+            voice_id="Joanna",
+            params=PollyTTSService.InputParams(engine="neural", language="en-US", rate="1.1"),
         )
 
-        llm = OpenAILLMService(api_key=os.getenv("OPENAI_API_KEY"))
+        llm = BedrockLLMService(
+            aws_region="ap-northeast-1",
+            model="apac.amazon.nova-lite-v1:0",
+            params=BedrockLLMService.InputParams(temperature=0.8, latency="standard"),
+        )
 
         ta = TalkingAnimation()
 
@@ -177,7 +182,7 @@ async def main():
             },
         ]
 
-        context = OpenAILLMContext(messages)
+        context = BedrockLLMContext(messages)
         context_aggregator = llm.create_context_aggregator(context)
 
         pipeline = Pipeline(

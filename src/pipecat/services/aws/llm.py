@@ -631,7 +631,8 @@ class BedrockLLMService(LLMService):
             }
 
             # Add system message
-            request_params["system"] = context.system
+            if context.system:
+                request_params["system"] = context.system
 
             # Add tools if present
             if context.tools:

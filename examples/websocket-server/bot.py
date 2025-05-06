@@ -16,11 +16,10 @@ from pipecat.frames.frames import BotInterruptionFrame, EndFrame
 from pipecat.pipeline.pipeline import Pipeline
 from pipecat.pipeline.runner import PipelineRunner
 from pipecat.pipeline.task import PipelineParams, PipelineTask
-from pipecat.processors.aggregators.openai_llm_context import OpenAILLMContext
 from pipecat.serializers.protobuf import ProtobufFrameSerializer
-from pipecat.services.cartesia.tts import CartesiaTTSService
-from pipecat.services.deepgram.stt import DeepgramSTTService
-from pipecat.services.openai.llm import OpenAILLMService
+from pipecat.services.aws.llm import BedrockLLMContext, BedrockLLMService
+from pipecat.services.aws.stt import TranscribeSTTService
+from pipecat.services.aws.tts import PollyTTSService
 from pipecat.transports.network.websocket_server import (
     WebsocketServerParams,
     WebsocketServerTransport,
@@ -90,13 +89,18 @@ async def main():
         )
     )
 
-    llm = OpenAILLMService(api_key=os.getenv("OPENAI_API_KEY"))
+    stt = TranscribeSTTService()
 
-    stt = DeepgramSTTService(api_key=os.getenv("DEEPGRAM_API_KEY"))
+    tts = PollyTTSService(
+        region="ap-northeast-1",  # only specific regions support generative TTS
+        voice_id="Joanna",
+        params=PollyTTSService.InputParams(engine="neural", language="en-US", rate="1.1"),
+    )
 
-    tts = CartesiaTTSService(
-        api_key=os.getenv("CARTESIA_API_KEY"),
-        voice_id="71a7ad14-091c-4e8e-a314-022ece01c121",  # British Reading Lady
+    llm = BedrockLLMService(
+        aws_region="ap-northeast-1",
+        model="apac.amazon.nova-lite-v1:0",
+        params=BedrockLLMService.InputParams(temperature=0.8, latency="standard"),
     )
 
     messages = [
@@ -106,7 +110,7 @@ async def main():
         },
     ]
 
-    context = OpenAILLMContext(messages)
+    context = BedrockLLMContext(messages)
     context_aggregator = llm.create_context_aggregator(context)
 
     pipeline = Pipeline(
@@ -133,7 +137,7 @@ async def main():
     @transport.event_handler("on_client_connected")
     async def on_client_connected(transport, client):
         # Kick off the conversation.
-        messages.append({"role": "system", "content": "Please introduce yourself to the user."})
+        messages.append({"role": "user", "content": "Please introduce yourself to the user."})
         await task.queue_frames([context_aggregator.user().get_context_frame()])
 
     @transport.event_handler("on_session_timeout")
